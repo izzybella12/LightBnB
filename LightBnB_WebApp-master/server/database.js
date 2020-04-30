@@ -106,14 +106,61 @@ exports.getAllReservations = getAllReservations;
  */
 
 const getAllProperties = function(options, limit = 10) {
-  return pool.query(`
-  SELECT properties.*, AVG(property_reviews.rating)
+
+  const queryParams = [];
+
+  let queryString = `
+  SELECT properties.*, AVG(property_reviews.rating) as average_rating
   FROM properties
   JOIN property_reviews ON property_id = properties.id
-  GROUP BY properties.id
-  LIMIT $1
-  `, [limit])
-  .then(res => res.rows);
+  `
+
+  if (options.city) {
+    queryParams.push(`%${options.city}%`)
+    queryString += `WHERE city LIKE $${queryParams.length} `;
+  }
+
+  if (options.minimum_price_per_night) {
+    if (queryParams.length !== 0) {
+      queryParams.push(options.minimum_price_per_night)
+      queryString += `AND cost_per_night > $${queryParams.length} `;
+    } else {
+      queryParams.push(options.minimum_price_per_night)
+      queryString += `WHERE cost_per_night > $${queryParams.length} `;
+    }
+  }
+
+  if (options.maximum_price_per_night) {
+    if (queryParams.length !== 0) {
+      queryParams.push(options.maximum_price_per_night)
+      queryString += `AND cost_per_night < $${queryParams.length} `;
+    } else {
+      queryParams.push(options.maximum_price_per_night)
+      queryString += `WHERE cost_per_night < $${queryParams.length} `;
+    }
+  }
+
+  if (options.minimum_rating) {
+    if (queryParams.length !== 0) {
+      queryParams.push(options.minimum_rating)
+      queryString += `AND property_reviews.rating >= $${queryParams.length} `;
+    } else {
+      queryParams.push(options.minimum_rating)
+      queryString += `WHERE property_reviews.rating >= $${queryParams.length} `;
+    }
+  }
+
+  queryParams.push(limit);
+  queryString += `GROUP BY properties.id
+  ORDER BY cost_per_night
+  LIMIT $${queryParams.length};
+  `;
+
+  console.log(options);
+  console.log(queryString, queryParams);
+
+  return pool.query(queryString, queryParams)
+  .then (res => res.rows);
 }
 exports.getAllProperties = getAllProperties;
 
